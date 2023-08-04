@@ -11,7 +11,7 @@ def main():
     import argparse
     import struct
     import imghdr
-    
+
 
     # Extra function to get image sizes
     def get_image_size(fname):
@@ -49,35 +49,35 @@ def main():
                 return
             return width, height
 
-    
+
     # Process arguments
     parser = argparse.ArgumentParser(description='Creates a spine .json file from an image sequence.')
-    
+
     parser.add_argument('--output', metavar='JSON_FILE', required=True,
         help='Output .json file: Example: "my_image_sequence.json"'
     )
-    
+
     parser.add_argument('--images', metavar='WILDCARD_PATH', required=True, nargs='+',
         help='Wildcard path to image sequence. This is relative to --images_root_path. Example: "my_images/*.png"'
     )
-    
+
     parser.add_argument('--images_root', metavar='FOLDER_PATH', default='',
         help='(Optional, default is current folder)The root path used in spine for images. Example: "assets/images/"'
     )
-    
+
     parser.add_argument('--merge', metavar='SPINE_JSON_FILE',
         help='(Optional) Spine skeleton to add image sequence to. If not supplied it will be added to an empty spine '
         'skeleton. Example: "my_existing_skeleton.json"'
     )
-    
+
     parser.add_argument('--bone', metavar='NAME', default='root',
         help='(Optional, default is "root") Bone name to attach to. Example: "my_bone"'
     )
-    
+
     parser.add_argument('--framerate', metavar='NUMBER', default=30, type=float,
         help='(Optional, default is 30) Framerate to animate at.'
     )
-    
+
     args = parser.parse_args()
 
 
@@ -89,13 +89,13 @@ def main():
     for glob_pattern in args.images:
         glob_pattern = os.path.join(args.images_root, glob_pattern)
         globbed_paths += glob(glob_pattern)
-    
+
     # Make image paths relative to image root
     image_paths = []
     for path in globbed_paths:
         image_paths.append(os.path.relpath(path, args.images_root))
 
-    if len(image_paths) == 0:
+    if not image_paths:
         print(' - No images to process!')
         print('No images found in supplied path.')
         print('Please verify --images and --images_root arguments are correct.\n')
@@ -147,7 +147,9 @@ class SpineSequence:
 
         # Verify there is a bone to attach to
         if not self.has_bone(bone_name):
-            raise LookupError('Cannot find bone_name "{}" in skeleton "{}".\n'.format(bone_name, skeleton_path))
+            raise LookupError(
+                f'Cannot find bone_name "{bone_name}" in skeleton "{skeleton_path}".\n'
+            )
 
 
         # Set width and height of document
@@ -159,42 +161,42 @@ class SpineSequence:
 
 
         # Ensure we have a slots array
-        if not 'slots' in self.skel:
+        if 'slots' not in self.skel:
             self.skel['slots'] = []
 
 
         # Ensure we have a skins dict
-        if not 'skins' in self.skel:
+        if 'skins' not in self.skel:
             self.skel['skins'] = OrderedDict()
-        
-        if not 'default' in self.skel['skins']:
+
+        if 'default' not in self.skel['skins']:
             self.skel['skins']['default'] = OrderedDict()
 
 
         # Ensure we have a slots animation dict
-        if not 'animations' in self.skel:
+        if 'animations' not in self.skel:
             self.skel['animations'] = OrderedDict()
-        
-        if not anim_name in self.skel['animations']:
+
+        if anim_name not in self.skel['animations']:
             self.skel['animations'][anim_name] = OrderedDict()
-        
-        if not 'slots' in self.skel['animations'][anim_name]:
+
+        if 'slots' not in self.skel['animations'][anim_name]:
             self.skel['animations'][anim_name]['slots'] = OrderedDict()
 
-        
+
         # Make a unique slot name
         existing_slot_names = []
         for slot in self.skel['slots']:
             existing_slot_names.append(slot['name'])
-        
+
         slot_name = os.path.splitext(image_paths[0])[0].replace('\\', '/')
         unique_slot_name = slot_name
         i = 0
         while unique_slot_name in existing_slot_names:
             i += 1
-            unique_slot_name = '{} ({})'.format(slot_name, i)
+            unique_slot_name = f'{slot_name} ({i})'
         slot_name = unique_slot_name
-        
+
 
         # Add slot
         # { "name": "fancy_slot", "bone": "fancy", "attachment": "fancy_000" }
@@ -203,7 +205,7 @@ class SpineSequence:
         slot['bone'] = bone_name
         slot['attachment'] = os.path.splitext(image_paths[0])[0].replace('\\', '/')
         self.skel['slots'].append(slot)
-        
+
 
         # Add attachments to slot
         # "fancy_000": { "width": 512, "height": 256 },
@@ -213,21 +215,18 @@ class SpineSequence:
             attachments[name] = OrderedDict()
             attachments[name]['width'] = width
             attachments[name]['height'] = height
-        
+
         self.skel['skins']['default'][slot_name] = attachments
 
 
         # Add frames to animation
         # { "time": 0.0333, "name": "fancy_000" },
         keyframes = []
-        count = 0
-        for image_path in image_paths:
+        for count, image_path in enumerate(image_paths):
             keyframe = OrderedDict()
             keyframe['time'] = self.round_time_like_spine((count / framerate))
             keyframe['name'] = os.path.splitext(image_path)[0].replace('\\', '/')
             keyframes.append(keyframe)
-            count += 1
-        
         self.skel['animations'][anim_name]['slots'][slot_name] = OrderedDict()
         self.skel['animations'][anim_name]['slots'][slot_name]['attachment'] = keyframes
 
@@ -240,10 +239,7 @@ class SpineSequence:
 
 
     def has_bone(self, bone_name):
-        for bone in self.skel['bones']:
-            if bone_name == bone['name']:
-                return True
-        return False
+        return any(bone_name == bone['name'] for bone in self.skel['bones'])
 
 
     def round_time_like_spine(self, time):
@@ -262,4 +258,4 @@ if __name__ == '__main__':
     import time
     start_time = time.time()
     main()
-    print('--- {} seconds ---'.format(round(time.time() - start_time, 5)))
+    print(f'--- {round(time.time() - start_time, 5)} seconds ---')
